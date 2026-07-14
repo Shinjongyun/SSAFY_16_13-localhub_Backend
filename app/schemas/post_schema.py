@@ -22,7 +22,8 @@ class CamelCaseModel(BaseModel):
     )
 
 
-class PostResponse(CamelCaseModel):
+# 목록에 들어가는 게시글
+class PostListItem(CamelCaseModel):
     id: int
     title: str
     category: Category
@@ -30,8 +31,18 @@ class PostResponse(CamelCaseModel):
     updated_at: datetime
 
 
+# 게시글 상세 정보
+class PostDetailData(CamelCaseModel):
+    id: int
+    title: str
+    content: str
+    category: Category
+    created_at: datetime
+    updated_at: datetime
+
+
 class PostListData(CamelCaseModel):
-    post_list: list[PostResponse]
+    post_list: list[PostListItem]
 
 
 class PostListResponse(CamelCaseModel):
@@ -39,3 +50,10 @@ class PostListResponse(CamelCaseModel):
     status: int
     message: str
     data: PostListData
+
+
+class PostDetailResponse(CamelCaseModel):
+    success: bool
+    status: int
+    message: str
+    data: PostDetailData
