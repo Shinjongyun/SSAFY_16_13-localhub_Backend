@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 
@@ -22,20 +22,23 @@ class CamelCaseModel(BaseModel):
     )
 
 
-# 목록에 들어가는 게시글
+# 게시글 작성 요청
+class PostCreateRequest(CamelCaseModel):
+    title: str = Field(min_length=1, max_length=100)
+    content: str = Field(min_length=1)
+    category: Category
+    password: str = Field(min_length=1, max_length=50)
+
+
+# 게시글 삭제 요청
+class PostDeleteRequest(CamelCaseModel):
+    password: str = Field(min_length=1, max_length=50)
+
+
+# 목록의 게시글 한 개
 class PostListItem(CamelCaseModel):
     id: int
     title: str
-    category: Category
-    created_at: datetime
-    updated_at: datetime
-
-
-# 게시글 상세 정보
-class PostDetailData(CamelCaseModel):
-    id: int
-    title: str
-    content: str
     category: Category
     created_at: datetime
     updated_at: datetime
@@ -52,8 +55,26 @@ class PostListResponse(CamelCaseModel):
     data: PostListData
 
 
+# 게시글 상세 데이터
+class PostDetailData(CamelCaseModel):
+    id: int
+    title: str
+    content: str
+    category: Category
+    created_at: datetime
+    updated_at: datetime
+
+
 class PostDetailResponse(CamelCaseModel):
     success: bool
     status: int
     message: str
     data: PostDetailData
+
+
+# 게시글 작성·삭제 응답
+class PostActionResponse(CamelCaseModel):
+    success: bool
+    status: int
+    message: str
+    data: None = None

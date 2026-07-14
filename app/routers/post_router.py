@@ -2,6 +2,9 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.schemas.post_schema import (
     Category,
+    PostActionResponse,
+    PostCreateRequest,
+    PostDeleteRequest,
     PostDetailResponse,
     PostListResponse,
 )
@@ -23,6 +26,19 @@ router = APIRouter(
 )
 def get_posts() -> PostListResponse:
     return post_service.get_posts()
+
+
+# 게시글 작성
+@router.post(
+    "",
+    response_model=PostActionResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_200_OK,
+)
+def create_post(
+    request: PostCreateRequest,
+) -> PostActionResponse:
+    return post_service.create_post(request)
 
 
 # 카테고리별 게시글 조회
@@ -48,12 +64,38 @@ def get_posts_by_category(
 def get_post(
     post_id: int,
 ) -> PostDetailResponse:
-    response = post_service.get_post(post_id)
+    try:
+        return post_service.get_post(post_id)
 
-    if response is None:
+    except post_service.PostNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="게시글을 찾을 수 없습니다.",
         )
 
-    return response
+
+# 게시글 삭제
+@router.delete(
+    "/{post_id}",
+    response_model=PostActionResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_200_OK,
+)
+def delete_post(
+    post_id: int,
+    request: PostDeleteRequest,
+) -> PostActionResponse:
+    try:
+        return post_service.delete_post(post_id, request)
+
+    except post_service.PostNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="게시글을 찾을 수 없습니다.",
+        )
+
+    except post_service.InvalidPostPasswordError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="비밀번호가 일치하지 않습니다.",
+        )
