@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.schemas.post_schema import (
     Category,
@@ -25,8 +25,14 @@ router = APIRouter(
     response_model_by_alias=True,
     status_code=status.HTTP_200_OK,
 )
-def get_posts() -> PostListResponse:
-    return post_service.get_posts()
+def get_posts(
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=10, ge=1, le=100),
+) -> PostListResponse:
+    return post_service.get_posts(
+        page=page,
+        size=size,
+    )
 
 
 # 게시글 작성
@@ -51,8 +57,14 @@ def create_post(
 )
 def get_posts_by_category(
     category: Category,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=10, ge=1, le=100),
 ) -> PostListResponse:
-    return post_service.get_posts_by_category(category)
+    return post_service.get_posts_by_category(
+        category=category,
+        page=page,
+        size=size,
+    )
 
 
 # 게시글 상세 조회

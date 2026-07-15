@@ -48,16 +48,25 @@ posts: list[Post] = [
 next_id = 4
 
 
-def find_all() -> list[Post]:
-    return posts.copy()
+def find_all(
+    page: int,
+    size: int,
+) -> tuple[list[Post], int]:
+    return paginate(posts, page, size)
 
 
-def find_all_by_category(category: Category) -> list[Post]:
-    return [
+def find_all_by_category(
+    category: Category,
+    page: int,
+    size: int,
+) -> tuple[list[Post], int]:
+    category_posts = [
         post
         for post in posts
         if post.category == category
     ]
+
+    return paginate(category_posts, page, size)
 
 
 def find_by_id(post_id: int) -> Post | None:
@@ -119,3 +128,18 @@ def update_by_id(
     post.updated_at = datetime.now()
 
     return post
+
+
+def paginate(
+    target_posts: list[Post],
+    page: int,
+    size: int,
+) -> tuple[list[Post], int]:
+    total_elements = len(target_posts)
+
+    start_index = (page - 1) * size
+    end_index = start_index + size
+
+    paged_posts = target_posts[start_index:end_index]
+
+    return paged_posts, total_elements

@@ -21,18 +21,39 @@ class InvalidPostPasswordError(Exception):
     pass
 
 
-def get_posts() -> PostListResponse:
-    posts = post_repository.find_all()
+def get_posts(
+    page: int,
+    size: int,
+) -> PostListResponse:
+    posts, total_elements = post_repository.find_all(
+        page=page,
+        size=size,
+    )
 
-    return create_post_list_response(posts)
-
+    return create_post_list_response(
+        posts=posts,
+        page=page,
+        size=size,
+        total_elements=total_elements,
+    )
 
 def get_posts_by_category(
     category: Category,
+    page: int,
+    size: int,
 ) -> PostListResponse:
-    posts = post_repository.find_all_by_category(category)
+    posts, total_elements = post_repository.find_all_by_category(
+        category=category,
+        page=page,
+        size=size,
+    )
 
-    return create_post_list_response(posts)
+    return create_post_list_response(
+        posts=posts,
+        page=page,
+        size=size,
+        total_elements=total_elements,
+    )
 
 
 def get_post(post_id: int) -> PostDetailResponse:
@@ -88,6 +109,9 @@ def delete_post(
 
 def create_post_list_response(
     posts: list[post_repository.Post],
+    page: int,
+    size: int,
+    total_elements: int,
 ) -> PostListResponse:
     post_items = [
         PostListItem(
@@ -100,12 +124,18 @@ def create_post_list_response(
         for post in posts
     ]
 
+    total_pages = (total_elements + size - 1) // size
+
     return PostListResponse(
         success=True,
         status=200,
         message="요청에 성공하였습니다.",
         data=PostListData(
             post_list=post_items,
+            page=page,
+            size=size,
+            total_elements=total_elements,
+            total_pages=total_pages,
         ),
     )
 

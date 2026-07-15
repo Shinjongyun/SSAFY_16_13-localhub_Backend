@@ -46,6 +46,10 @@ class PostListItem(CamelCaseModel):
 
 class PostListData(CamelCaseModel):
     post_list: list[PostListItem]
+    page: int
+    size: int
+    total_elements: int
+    total_pages: int
 
 
 class PostListResponse(CamelCaseModel):
