@@ -36,7 +36,6 @@ CATEGORY_MAP = {
     "LEISURE": "레포츠",
     "SHOPPING": "쇼핑",
     "ACCOMMODATION": "숙박",
-    "RESTAURANT": "음식점",
     "FESTIVAL": "축제공연행사",
 }
 
