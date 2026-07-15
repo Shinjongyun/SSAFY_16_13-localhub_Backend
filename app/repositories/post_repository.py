@@ -20,7 +20,10 @@ def find_all(
 
         statement = (
             select(Post)
-            .order_by(Post.id.asc())
+            .order_by(
+                Post.created_at.desc(),
+                Post.id.desc(),
+            )
             .offset(offset)
             .limit(size)
         )
@@ -48,7 +51,10 @@ def find_all_by_category(
         statement = (
             select(Post)
             .where(Post.category == category)
-            .order_by(Post.id.asc())
+            .order_by(
+                Post.created_at.desc(),
+                Post.id.desc(),
+            )
             .offset(offset)
             .limit(size)
         )
