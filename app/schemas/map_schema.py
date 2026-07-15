@@ -7,11 +7,11 @@ class MapItem(BaseModel):
     )
 
     map_x: str = Field(
-        serialization_alias="maX"
+        serialization_alias="mapX"
     )
 
     map_y: str = Field(
-        serialization_alias="maY"
+        serialization_alias="mapY"
     )
 
     model_config = ConfigDict(
