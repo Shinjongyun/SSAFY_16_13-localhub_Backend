@@ -101,3 +101,21 @@ def delete_by_id(post_id: int) -> bool:
             return True
 
     return False
+
+def update_by_id(
+    post_id: int,
+    title: str,
+    content: str,
+    category: Category,
+) -> Post | None:
+    post = find_by_id(post_id)
+
+    if post is None:
+        return None
+
+    post.title = title
+    post.content = content
+    post.category = category
+    post.updated_at = datetime.now()
+
+    return post

@@ -7,6 +7,7 @@ from app.schemas.post_schema import (
     PostDeleteRequest,
     PostDetailResponse,
     PostListResponse,
+    PostUpdateRequest,
 )
 from app.services import post_service
 
@@ -19,7 +20,7 @@ router = APIRouter(
 
 # 전체 게시글 조회
 @router.get(
-    "",
+    "/all",
     response_model=PostListResponse,
     response_model_by_alias=True,
     status_code=status.HTTP_200_OK,
@@ -87,6 +88,32 @@ def delete_post(
 ) -> PostActionResponse:
     try:
         return post_service.delete_post(post_id, request)
+
+    except post_service.PostNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="게시글을 찾을 수 없습니다.",
+        )
+
+    except post_service.InvalidPostPasswordError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="비밀번호가 일치하지 않습니다.",
+        )
+    
+# 게시글 수정
+@router.put(
+    "/{post_id}",
+    response_model=PostActionResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_200_OK,
+)
+def update_post(
+    post_id: int,
+    request: PostUpdateRequest,
+) -> PostActionResponse:
+    try:
+        return post_service.update_post(post_id, request)
 
     except post_service.PostNotFoundError:
         raise HTTPException(

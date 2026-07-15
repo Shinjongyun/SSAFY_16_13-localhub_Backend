@@ -9,6 +9,7 @@ from app.schemas.post_schema import (
     PostListData,
     PostListItem,
     PostListResponse,
+    PostUpdateRequest,
 )
 
 
@@ -116,3 +117,24 @@ def create_success_response() -> PostActionResponse:
         message="요청에 성공하였습니다.",
         data=None,
     )
+
+def update_post(
+    post_id: int,
+    request: PostUpdateRequest,
+) -> PostActionResponse:
+    post = post_repository.find_by_id(post_id)
+
+    if post is None:
+        raise PostNotFoundError
+
+    if post.password != request.password:
+        raise InvalidPostPasswordError
+
+    post_repository.update_by_id(
+        post_id=post_id,
+        title=request.title,
+        content=request.content,
+        category=request.category,
+    )
+
+    return create_success_response()

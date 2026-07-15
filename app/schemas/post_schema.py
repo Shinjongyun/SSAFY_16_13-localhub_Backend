@@ -78,3 +78,9 @@ class PostActionResponse(CamelCaseModel):
     status: int
     message: str
     data: None = None
+
+class PostUpdateRequest(CamelCaseModel):
+    title: str = Field(min_length=1, max_length=100)
+    content: str = Field(min_length=1)
+    category: Category
+    password: str = Field(min_length=1, max_length=50)
