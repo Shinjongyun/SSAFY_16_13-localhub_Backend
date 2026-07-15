@@ -23,7 +23,7 @@ load_dotenv()
 
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")
 
 
 class ChatService:
@@ -46,6 +46,11 @@ class ChatService:
 
         message = message.strip()
 
+        # 클라이언트가 빈 문자열("")로 "이전 대화 없음"을 표현하는 경우가 있어
+        # 여기서 한 번에 None으로 정규화한다.
+        # 이후 모든 핸들러/OpenAI 호출은 None 또는 유효한 resp_id만 받는다고 가정할 수 있다.
+        previous_response_id = previous_response_id or None
+
         if not message:
 
             raise HTTPException(
@@ -61,12 +66,25 @@ class ChatService:
             previous_response_id=previous_response_id,
         )
 
+        print(
+            f"[DEBUG] intent={analysis.intent}, category={analysis.category}, "
+            f"district={analysis.district}, keywords={analysis.keywords}"
+        )
 
         # -----------------------------------
-        # PLACE 추천
+        # category가 채워져 있으면 intent 분류 결과와 무관하게
+        # JSON 검색을 우선한다.
+        #
+        # 이유: 대화가 이어질수록 분류기가 intent를 FOLLOW_UP으로
+        # 잘못 판단하는 경우가 있다 (예: "강동구 관광할만한곳 추천"처럼
+        # 새로운 카테고리가 등장했는데도 직전 흐름에 끌려 FOLLOW_UP으로
+        # 오분류되어 JSON 재검색 없이 이전 답변을 재탕하는 문제).
+        # category 필드는 상대적으로 안정적으로 추출되므로,
+        # category가 있다는 것 자체를 "새로 검색이 필요한 질문"의
+        # 신호로 삼아 코드 레벨에서 방어한다.
         # -----------------------------------
 
-        if analysis.intent == ChatIntent.PLACE_RECOMMEND:
+        if analysis.category is not None:
             return self._handle_place_recommend(
                 message=message,
                 analysis=analysis,
@@ -75,6 +93,8 @@ class ChatService:
 
         # -----------------------------------
         # 이전 대화 후속질문
+        # (category가 없는 순수 지시대명사형 질문:
+        #  "그중에서 1곳만", "거기 주소 알려줘" 등)
         # -----------------------------------
 
         if analysis.intent == ChatIntent.FOLLOW_UP:
@@ -82,7 +102,7 @@ class ChatService:
                 message=message,
                 previous_response_id=previous_response_id,
             )
-        
+
         # -----------------------------------
         # 서울 관련 질문
         # -----------------------------------
@@ -112,138 +132,143 @@ class ChatService:
             )
 
         return self.client
-    
+
     def _analyze_question(
-            self,
-            message: str,
-            previous_response_id: str | None,
-        ) -> ChatAnalysis:
+        self,
+        message: str,
+        previous_response_id: str | None,
+    ) -> tuple[ChatAnalysis, str]:
 
-            client = self._get_client()
+        client = self._get_client()
 
-            system_prompt = """
-    너는 서울 지역 정보 챗봇의 질문 분류기다.
+        system_prompt = """
+너는 서울 지역 정보 챗봇의 질문 분류기다.
 
-    질문을 아래 네 가지 중 하나로 분류한다.
+질문을 아래 네 가지 중 하나로 분류한다.
 
-    1. PLACE_RECOMMEND
+1. PLACE_RECOMMEND
 
-    서울 지역 장소 추천 질문이다.
+서울 지역 장소 추천 질문이다.
 
-    지원 카테고리
+지원 카테고리
 
-    ATTRACTION
-    CULTURE
-    LEISURE
-    SHOPPING
-    ACCOMMODATION
-    FESTIVAL
+ATTRACTION
+CULTURE
+LEISURE
+SHOPPING
+ACCOMMODATION
+FESTIVAL
 
-    2. FOLLOW_UP
+이 경우 category는 반드시 위 카테고리 중 하나로 채운다.
+카테고리를 특정할 수 있는 질문이면
+이전 대화의 흐름과 무관하게 PLACE_RECOMMEND로 분류하고
+category를 채운다.
 
-    이전 대화를 이어가는 질문이다.
+2. FOLLOW_UP
 
-    예시
+이전 대화를 이어가는 질문이며,
+새로운 장소 카테고리를 특정할 수 없는 경우다.
 
-    그중에서
-    거기는?
-    첫 번째는?
-    방금 추천한 곳은?
-    그 장소 주소 알려줘
+예시
 
-    단, 새로운 지역이나 새로운 카테고리가 등장하면 FOLLOW_UP이 아니다.
+그중에서
+거기는?
+첫 번째는?
+방금 추천한 곳은?
+그 장소 주소 알려줘
 
-    3. REGIONAL_INFO
+단, 새로운 지역이나 새로운 카테고리가 등장하면
+FOLLOW_UP이 아니라 PLACE_RECOMMEND다.
 
-    서울 지역 관련 질문이지만
-    JSON 검색만으로 답할 수 없는 질문이다.
+3. REGIONAL_INFO
 
-    예시
+서울 지역 관련 질문이지만
+JSON 검색만으로 답할 수 없는 질문이다.
 
-    운영시간
-    입장료
-    오늘 축제
-    음식점
-    맛집
-    실시간 정보
+예시
 
-    4. UNKNOWN
+운영시간
+입장료
+오늘 축제
+실시간 정보
 
-    서울 지역과 무관한 질문이다.
+4. UNKNOWN
 
-    예시
+서울 지역과 무관한 질문이다.
 
-    파이썬 코드 작성
+예시
 
-    부산 여행
+파이썬 코드 작성
 
-    미국 주식
+부산 여행
 
-    district에는 서울 구 이름만 넣는다.
+미국 주식
 
-    keywords에는
-    title
-    addr1
-    addr2
+district에는 서울 구 이름만 넣는다.
 
-    검색에 필요한 단어만 넣는다.
-    """.strip()
+keywords 규칙:
+- 사용자가 메시지에서 직접 언급한 장소명, 지명, 상호명만 넣는다.
+- 사용자가 특정 장소를 언급하지 않았다면 keywords는 빈 배열로 둔다.
+- 카테고리를 나타내는 일반 단어
+  (관광지, 맛집, 명소, 쇼핑, 서울, 서울특별시 등)는 keywords에 넣지 않는다.
+- 실제 존재 여부를 모르는 장소 이름을 추측해서 넣지 않는다.
+""".strip()
 
-            messages = [
-                {
-                    "role": "system",
-                    "content": system_prompt,
-                },
-                {
-                    "role": "user",
-                    "content": message,
-                },
-            ]
+        messages = [
+            {
+                "role": "system",
+                "content": system_prompt,
+            },
+            {
+                "role": "user",
+                "content": message,
+            },
+        ]
 
-            try:
+        try:
 
-                kwargs = {
-                    "model": OPENAI_MODEL,
-                    "input": messages,
-                    "text_format": ChatAnalysis,
-                }
+            kwargs = {
+                "model": OPENAI_MODEL,
+                "input": messages,
+                "text_format": ChatAnalysis,
+            }
 
-                if previous_response_id:
-                    kwargs["previous_response_id"] = previous_response_id
+            if previous_response_id:
+                kwargs["previous_response_id"] = previous_response_id
 
-                response = client.responses.parse(
-                    **kwargs
+            response = client.responses.parse(
+                **kwargs
+            )
+
+            analysis = response.output_parsed
+
+            if analysis is None:
+                raise ValueError(
+                    "분석 실패"
                 )
 
-                analysis = response.output_parsed
+            return analysis, response.id
 
-                if analysis is None:
-                    raise ValueError(
-                        "분석 실패"
-                    )
+        except (
+            OpenAIError,
+            ValueError,
+        ) as error:
 
-                return analysis, response.id
-
-            except (
-                OpenAIError,
-                ValueError,
-            ) as error:
-
-                raise HTTPException(
-                    status_code=502,
-                    detail={
-                        "message": "질문 분석 실패",
-                        "data": {
-                            "reason": str(error)
-                        },
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "message": "질문 분석 실패",
+                    "data": {
+                        "reason": str(error)
                     },
-                ) from error
-            
+                },
+            ) from error
+
     def _handle_place_recommend(
         self,
         message: str,
         analysis: ChatAnalysis,
-        previous_response_id: str,
+        previous_response_id: str | None,
     ) -> ChatResponse:
 
         if analysis.category is None:
@@ -287,21 +312,27 @@ class ChatService:
     def _handle_follow_up(
         self,
         message: str,
-        previous_response_id: str,
+        previous_response_id: str | None,
     ) -> ChatResponse:
         client = self._get_client()
 
+        kwargs = {
+            "model": OPENAI_MODEL,
+            "instructions": (
+                "이전 대화를 참고하여 사용자의 후속 질문에 "
+                "한국어로 간단히 답변하세요. "
+                "이전 대화에 없는 정보는 추측하지 마세요."
+            ),
+            "input": message,
+            "store": True,
+        }
+
+        if previous_response_id:
+            kwargs["previous_response_id"] = previous_response_id
+
         try:
             response = client.responses.create(
-                model=OPENAI_MODEL,
-                previous_response_id=previous_response_id,
-                instructions=(
-                    "이전 대화를 참고하여 사용자의 후속 질문에 "
-                    "한국어로 간단히 답변하세요. "
-                    "이전 대화에 없는 정보는 추측하지 마세요."
-                ),
-                input=message,
-                store=True,
+                **kwargs
             )
 
             answer = response.output_text.strip()
@@ -333,8 +364,7 @@ class ChatService:
                     },
                 },
             ) from error
-        
-        
+
     def _handle_regional_info(
         self,
         message: str,
@@ -436,14 +466,12 @@ class ChatService:
                 responseId=None,
             ),
         )
-    
 
-    
     def _generate_place_answer(
         self,
         user_message: str,
         places: list[ChatPlaceItem],
-        previous_response_id: str,
+        previous_response_id: str | None,
     ) -> tuple[str, str | None]:
         client = self._get_client()
 
@@ -453,25 +481,25 @@ class ChatService:
         ]
 
         input_messages = [
-    {
-        "role": "system",
-        "content": """
+            {
+                "role": "system",
+                "content": """
 너는 서울 지역 장소 추천 챗봇이다.
 
 제공된 JSON 검색 결과만 사용하여 답변한다.
 검색 결과에 없는 내용은 추측하지 않는다.
 장소 이름과 주소를 목록으로 안내한다.
 """.strip(),
-    },
-    {
-        "role": "user",
-        "content": (
-            f"사용자 질문:\n{user_message}\n\n"
-            "JSON 검색 결과:\n"
-            f"{json.dumps(place_data, ensure_ascii=False)}"
-        ),
-    },
-]
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"사용자 질문:\n{user_message}\n\n"
+                    "JSON 검색 결과:\n"
+                    f"{json.dumps(place_data, ensure_ascii=False)}"
+                ),
+            },
+        ]
 
         kwargs = {
             "model": OPENAI_MODEL,
@@ -485,11 +513,12 @@ class ChatService:
             )
 
         try:
+            # 조건부로 만든 kwargs를 그대로 사용한다.
+            # (이전 버전에서는 kwargs를 만들어놓고 실제 호출에서는
+            #  previous_response_id를 무조건 넘겨서, None/""이 들어와도
+            #  파라미터가 그대로 전달되어 OpenAIError가 나는 버그가 있었다.)
             response = client.responses.create(
-                model=OPENAI_MODEL,
-                previous_response_id=previous_response_id,
-                input=input_messages,
-                store=True,
+                **kwargs
             )
 
             answer = response.output_text.strip()
