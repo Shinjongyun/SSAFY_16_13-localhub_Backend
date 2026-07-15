@@ -30,13 +30,19 @@ MOBILE_OS = "ETC"
 MOBILE_APP = "LocalHub"
 
 
-ALLOWED_CATEGORIES = {
-    "관광지",
-    "문화시설",
-    "축제공연행사",
-    "레포츠",
-    "숙박",
-    "쇼핑"
+CATEGORY_MAP = {
+    "ATTRACTION": "관광지",
+    "CULTURE": "문화시설",
+    "LEISURE": "레포츠",
+    "SHOPPING": "쇼핑",
+    "ACCOMMODATION": "숙박",
+    "RESTAURANT": "음식점",
+    "FESTIVAL": "축제공연행사",
+}
+
+REVERSE_CATEGORY_MAP = {
+    value: key
+    for key, value in CATEGORY_MAP.items()
 }
 
 
@@ -46,9 +52,11 @@ class MapService:
         db: Session,
         category: str
     ) -> MapResponse:
-        normalized_category = category.strip()
+        normalized_category = category.strip().upper()
 
-        if normalized_category not in ALLOWED_CATEGORIES:
+        korean_category = CATEGORY_MAP.get(normalized_category)
+
+        if korean_category is None:
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -56,7 +64,7 @@ class MapService:
                     "data": {
                         "category": normalized_category,
                         "availableCategories": sorted(
-                            ALLOWED_CATEGORIES
+                            CATEGORY_MAP.keys()
                         )
                     }
                 }
@@ -66,7 +74,7 @@ class MapService:
             tourism_infos = (
                 map_repository.find_all_by_content_type(
                     db=db,
-                    content_type=normalized_category
+                    content_type=korean_category
                 )
             )
 
