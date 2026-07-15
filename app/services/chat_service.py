@@ -48,7 +48,6 @@ class ChatService:
 
         # 클라이언트가 빈 문자열("")로 "이전 대화 없음"을 표현하는 경우가 있어
         # 여기서 한 번에 None으로 정규화한다.
-        # 이후 모든 핸들러/OpenAI 호출은 None 또는 유효한 resp_id만 받는다고 가정할 수 있다.
         previous_response_id = previous_response_id or None
 
         if not message:
@@ -72,16 +71,37 @@ class ChatService:
         )
 
         # -----------------------------------
-        # category가 채워져 있으면 intent 분류 결과와 무관하게
-        # JSON 검색을 우선한다.
+        # REGIONAL_INFO / UNKNOWN은 모델이 "JSON으로 못 푼다"고
+        # 명시적으로 판단한 경우이므로 최우선으로 처리한다.
+        # category가 우연히 채워져 있더라도 이 판단을 뒤집지 않는다.
+        # (예: "음식점 추천해줘"는 지원 카테고리가 없어 REGIONAL_INFO여야
+        #  하는데, category 우선 라우팅이 이걸 덮어써서 억지로
+        #  JSON 검색으로 보내던 문제가 있었다.)
+        # -----------------------------------
+
+        if analysis.intent == ChatIntent.REGIONAL_INFO:
+            return self._handle_regional_info(
+                message=message,
+                previous_response_id=previous_response_id,
+            )
+
+        if analysis.intent == ChatIntent.UNKNOWN:
+            return self._handle_unknown()
+
+        # -----------------------------------
+        # 여기부터는 intent가 PLACE_RECOMMEND 또는 FOLLOW_UP인 경우만
+        # 남는다. 이 둘 사이에서는 category 유무를 타이브레이커로 쓴다.
         #
-        # 이유: 대화가 이어질수록 분류기가 intent를 FOLLOW_UP으로
-        # 잘못 판단하는 경우가 있다 (예: "강동구 관광할만한곳 추천"처럼
-        # 새로운 카테고리가 등장했는데도 직전 흐름에 끌려 FOLLOW_UP으로
-        # 오분류되어 JSON 재검색 없이 이전 답변을 재탕하는 문제).
-        # category 필드는 상대적으로 안정적으로 추출되므로,
-        # category가 있다는 것 자체를 "새로 검색이 필요한 질문"의
+        # 이유: 대화가 이어질수록 분류기가 새로운 카테고리 등장을
+        # 놓치고 intent를 FOLLOW_UP으로 잘못 판단하는 경우가 있다
+        # (예: 쇼핑 얘기하다 "관광지도 추천해줘"라고 하면 새 카테고리인데도
+        #  FOLLOW_UP으로 오분류되어 JSON 재검색 없이 이전 답변을 재탕).
+        # category가 채워져 있다는 것 자체를 "새로 검색이 필요한 질문"의
         # 신호로 삼아 코드 레벨에서 방어한다.
+        #
+        # 단, REGIONAL_INFO/UNKNOWN은 위에서 이미 걸러졌기 때문에
+        # 이 분기가 "지원하지 않는 카테고리(예: 음식점)"까지
+        # 억지로 PLACE_RECOMMEND로 끌고 가는 일은 없다.
         # -----------------------------------
 
         if analysis.category is not None:
@@ -91,33 +111,10 @@ class ChatService:
                 previous_response_id=previous_response_id,
             )
 
-        # -----------------------------------
-        # 이전 대화 후속질문
-        # (category가 없는 순수 지시대명사형 질문:
-        #  "그중에서 1곳만", "거기 주소 알려줘" 등)
-        # -----------------------------------
-
-        if analysis.intent == ChatIntent.FOLLOW_UP:
-            return self._handle_follow_up(
-                message=message,
-                previous_response_id=previous_response_id,
-            )
-
-        # -----------------------------------
-        # 서울 관련 질문
-        # -----------------------------------
-
-        if analysis.intent == ChatIntent.REGIONAL_INFO:
-            return self._handle_regional_info(
-                message=message,
-                previous_response_id=previous_response_id,
-            )
-
-        # -----------------------------------
-        # 서울과 무관
-        # -----------------------------------
-
-        return self._handle_unknown()
+        return self._handle_follow_up(
+            message=message,
+            previous_response_id=previous_response_id,
+        )
 
     def _get_client(self) -> OpenAI:
 
@@ -148,16 +145,17 @@ class ChatService:
 
 1. PLACE_RECOMMEND
 
-서울 지역 장소 추천 질문이다.
+서울 지역 장소 추천 질문이며,
+아래 지원 카테고리 중 하나에 해당하는 경우다.
 
 지원 카테고리
 
-ATTRACTION
-CULTURE
-LEISURE
-SHOPPING
-ACCOMMODATION
-FESTIVAL
+ATTRACTION (관광지)
+CULTURE (문화시설)
+LEISURE (레포츠)
+SHOPPING (쇼핑)
+ACCOMMODATION (숙박)
+FESTIVAL (축제/공연/행사)
 
 이 경우 category는 반드시 위 카테고리 중 하나로 채운다.
 카테고리를 특정할 수 있는 질문이면
@@ -185,8 +183,16 @@ FOLLOW_UP이 아니라 PLACE_RECOMMEND다.
 서울 지역 관련 질문이지만
 JSON 검색만으로 답할 수 없는 질문이다.
 
+지원 카테고리(ATTRACTION, CULTURE, LEISURE, SHOPPING,
+ACCOMMODATION, FESTIVAL)에 해당하지 않는 장소 유형은
+전부 REGIONAL_INFO로 분류하고, category는 반드시 null로 둔다.
+지원 카테고리에 억지로 끼워맞추지 않는다.
+
 예시
 
+음식점
+맛집
+카페
 운영시간
 입장료
 오늘 축제
@@ -513,10 +519,6 @@ keywords 규칙:
             )
 
         try:
-            # 조건부로 만든 kwargs를 그대로 사용한다.
-            # (이전 버전에서는 kwargs를 만들어놓고 실제 호출에서는
-            #  previous_response_id를 무조건 넘겨서, None/""이 들어와도
-            #  파라미터가 그대로 전달되어 OpenAIError가 나는 버그가 있었다.)
             response = client.responses.create(
                 **kwargs
             )
