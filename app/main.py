@@ -7,6 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.database import Base, engine
 from app.models.post import Post
 from app.routers.post_router import router as post_router
+from app.routers.map_router import router as map_router
 
 
 # 서버 실행 시 등록된 SQLAlchemy 모델의 테이블 생성
@@ -45,6 +46,5 @@ def health_check() -> dict[str, str]:
         "message": "LocalHub 서버가 정상적으로 실행 중입니다."
     }
 
-
-# 게시글 API Router 등록
 app.include_router(post_router)
+app.include_router(map_router)
