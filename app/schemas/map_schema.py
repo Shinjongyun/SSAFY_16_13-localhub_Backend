@@ -34,3 +34,27 @@ class MapResponse(BaseModel):
     status: int
     message: str
     data: MapData
+
+
+class MapDetailData(BaseModel):
+    title: str
+
+    first_image: str | None = Field(
+        default=None,
+        serialization_alias="firstimage"
+    )
+
+    addr1: str | None = None
+    addr2: str | None = None
+    overview: str | None = None
+
+    model_config = ConfigDict(
+        populate_by_name=True
+    )
+
+
+class MapDetailResponse(BaseModel):
+    success: bool
+    status: int
+    message: str
+    data: MapDetailData

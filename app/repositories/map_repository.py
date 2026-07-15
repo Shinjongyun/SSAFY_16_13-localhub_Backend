@@ -24,5 +24,22 @@ class MapRepository:
 
         return list(result.scalars().all())
 
+    def find_by_content_id(
+        self,
+        db: Session,
+        content_id: int
+    ) -> TourismInfo | None:
+        statement = (
+            select(TourismInfo)
+            .where(
+                TourismInfo.content_id == content_id
+            )
+            .limit(1)
+        )
+
+        result = db.execute(statement)
+
+        return result.scalars().first()
+
 
 map_repository = MapRepository()
