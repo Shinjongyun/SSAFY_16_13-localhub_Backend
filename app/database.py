@@ -6,7 +6,7 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / "localhub.db"
+DB_PATH = BASE_DIR / "data" / "localhub.db"
 
 DATABASE_URL = f"sqlite:///{DB_PATH.as_posix()}"
 

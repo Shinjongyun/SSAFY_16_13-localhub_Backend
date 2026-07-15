@@ -9,6 +9,7 @@ from app.database import Base, engine
 from app.models.post import Post
 from app.routers.map_router import router as map_router
 from app.routers.post_router import router as post_router
+from app.routers.chat_router import router as chat_router
 
 
 # 등록된 SQLAlchemy 모델을 기반으로 테이블 생성
@@ -65,3 +66,4 @@ def health_check() -> dict[str, str]:
 # 라우터 등록
 app.include_router(post_router)
 app.include_router(map_router)
+app.include_router(chat_router)
