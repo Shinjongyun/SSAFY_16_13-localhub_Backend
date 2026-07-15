@@ -1,15 +1,15 @@
+from datetime import datetime
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from datetime import datetime
-from typing import Any
 
 from app.database import Base, engine
 from app.models.post import Post
 from app.routers.post_router import router as post_router
 
 
-# 등록된 SQLAlchemy 모델을 바탕으로 테이블 생성
+# 서버 실행 시 등록된 SQLAlchemy 모델의 테이블 생성
 Base.metadata.create_all(bind=engine)
 
 
@@ -17,6 +17,7 @@ app = FastAPI(
     title="LocalHub API",
     version="1.0.0",
 )
+
 
 # 예외 처리기
 @app.exception_handler(StarletteHTTPException)
@@ -45,4 +46,5 @@ def health_check() -> dict[str, str]:
     }
 
 
+# 게시글 API Router 등록
 app.include_router(post_router)
