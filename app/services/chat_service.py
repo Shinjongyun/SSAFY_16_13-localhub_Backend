@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from fastapi import HTTPException
 from openai import OpenAI
 from openai import OpenAIError
+from sqlalchemy.orm import Session
 
 from app.repositories.chat_repository import (
     chat_repository
@@ -40,6 +41,7 @@ class ChatService:
 
     def chat(
         self,
+        db: Session,
         message: str,
         previous_response_id: str | None,
     ) -> ChatResponse:
@@ -106,6 +108,7 @@ class ChatService:
 
         if analysis.category is not None:
             return self._handle_place_recommend(
+                db=db,
                 message=message,
                 analysis=analysis,
                 previous_response_id=previous_response_id,
@@ -272,6 +275,7 @@ keywords 규칙:
 
     def _handle_place_recommend(
         self,
+        db: Session,
         message: str,
         analysis: ChatAnalysis,
         previous_response_id: str | None,
@@ -285,6 +289,7 @@ keywords 규칙:
             )
 
         places = chat_repository.search_places(
+            db=db,
             category=analysis.category,
             district=analysis.district,
             keywords=analysis.keywords,

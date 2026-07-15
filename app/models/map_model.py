@@ -1,7 +1,11 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import DateTime
+from sqlalchemy import Float
+from sqlalchemy import Integer
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import mapped_column
 
 from app.database import Base
 
@@ -12,38 +16,62 @@ class TourismInfo(Base):
     id: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
-        autoincrement=True
+        index=True,
     )
 
-    content_id: Mapped[int] = mapped_column(
+    content_id: Mapped[str] = mapped_column(
         "contentId",
-        Integer,
+        String,
         nullable=False,
-        index=True
+        unique=True,
     )
 
     content_type: Mapped[str] = mapped_column(
         String,
         nullable=False,
-        index=True
     )
 
     map_x: Mapped[float | None] = mapped_column(
         Float,
-        nullable=True
+        nullable=True,
     )
 
     map_y: Mapped[float | None] = mapped_column(
         Float,
-        nullable=True
+        nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False
+    category: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
     )
 
-    updated_at: Mapped[datetime] = mapped_column(
+    title: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    addr1: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    addr2: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    firstimage: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime,
-        nullable=False
+        nullable=True,
+    )
+
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
     )

@@ -1,93 +1,77 @@
-import json
-from pathlib import Path
-from typing import Any
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from app.models.map_model import TourismInfo
 from app.schemas.chat_schema import (
     ChatCategory,
     ChatPlaceItem,
 )
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_DIR = BASE_DIR / "data"
 
-
-CATEGORY_FILE_MAP = {
-    ChatCategory.ATTRACTION: "서울_관광지.json",
-    ChatCategory.CULTURE: "서울_문화시설.json",
-    ChatCategory.LEISURE: "서울_레포츠.json",
-    ChatCategory.SHOPPING: "서울_쇼핑.json",
-    ChatCategory.ACCOMMODATION: "서울_숙박.json",
-    ChatCategory.FESTIVAL: "서울_축제공연행사.json",
+# FE ↔ BE에서는 영어 카테고리를 사용하고,
+# DB 조회 시에는 한글 content_type으로 변환한다.
+CATEGORY_CONTENT_TYPE_MAP = {
+    ChatCategory.ATTRACTION: "관광지",
+    ChatCategory.CULTURE: "문화시설",
+    ChatCategory.LEISURE: "레포츠",
+    ChatCategory.SHOPPING: "쇼핑",
+    ChatCategory.ACCOMMODATION: "숙박",
+    ChatCategory.FESTIVAL: "축제공연행사",
 }
 
 
 class ChatRepository:
 
-    def __init__(self):
-        self.cache = self._load_json()
-
-    def _load_json(self):
-
-        cache = {}
-
-        for category, filename in CATEGORY_FILE_MAP.items():
-
-            path = DATA_DIR / filename
-
-            if not path.exists():
-                cache[category] = []
-                continue
-
-            with open(
-                path,
-                encoding="utf-8"
-            ) as file:
-
-                json_data = json.load(file)
-
-            cache[category] = json_data.get(
-                "items",
-                []
-            )
-
-        return cache
-
     def search_places(
         self,
+        db: Session,
         category: ChatCategory,
         district: str | None,
         keywords: list[str],
         limit: int = 5,
     ) -> list[ChatPlaceItem]:
 
-        items = self.cache.get(
-            category,
-            []
+        content_type = CATEGORY_CONTENT_TYPE_MAP.get(
+            category
         )
 
-        results = []
+        if content_type is None:
+            return []
+
+        statement = (
+            select(TourismInfo)
+            .where(
+                TourismInfo.content_type == content_type
+            )
+            .order_by(
+                TourismInfo.id.asc()
+            )
+        )
+
+        result = db.execute(
+            statement
+        )
+
+        items = list(
+            result.scalars().all()
+        )
+
+        results: list[
+            tuple[int, ChatPlaceItem]
+        ] = []
 
         for item in items:
 
             title = str(
-                item.get(
-                    "title",
-                    ""
-                )
+                item.title or ""
             )
 
             addr1 = str(
-                item.get(
-                    "addr1",
-                    ""
-                )
+                item.addr1 or ""
             )
 
             addr2 = str(
-                item.get(
-                    "addr2",
-                    ""
-                )
+                item.addr2 or ""
             )
 
             search_text = (
@@ -119,16 +103,16 @@ class ChatRepository:
                 (
                     score,
                     ChatPlaceItem(
-                        contentId=item.get(
-                            "contentid"
+                        contentId=(
+                            str(item.content_id)
+                            if item.content_id is not None
+                            else None
                         ),
                         category=category,
                         title=title,
                         addr1=addr1 or None,
                         addr2=addr2 or None,
-                        firstimage=item.get(
-                            "firstimage"
-                        ),
+                        firstimage=item.firstimage or None,
                     ),
                 )
             )
