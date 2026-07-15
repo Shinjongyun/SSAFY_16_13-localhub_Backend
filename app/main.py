@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.routers.post_router import router as post_router
+from app.routers.map_router import router as map_router
 
 
 app = FastAPI(
@@ -17,3 +18,4 @@ def health_check() -> dict[str, str]:
 
 
 app.include_router(post_router)
+app.include_router(map_router)
